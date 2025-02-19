@@ -1,63 +1,86 @@
-import os
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
+from scipy.integrate import nquad
 
-data_dir = "Local_density_of_states_near_band_edge"
-heatmap_dir = os.path.join(data_dir, "local density of states heatmap")
+# ------------------------------
+# 🟢 Helper Functions
+# ------------------------------
 
-if not os.path.exists(heatmap_dir):
-    os.makedirs(heatmap_dir)
+def is_positive_definite(A):
+    """Check if matrix A is positive definite."""
+    return np.all(np.linalg.eigvals(A) > 0)
 
-def plot_heatmap(filename):
-    """Plots and saves a heatmap of the LDOS data."""
-    data = np.loadtxt(os.path.join(data_dir, filename))
-    plt.figure(figsize=(8, 6))
-    sns.heatmap(data, cmap="inferno", cbar=True)
-    plt.title(f"LDOS Heatmap - {filename}")
-    plt.savefig(os.path.join(heatmap_dir, f"{filename}_heatmap.png"))
-    plt.close()
+def gaussian_integrand(*v, A, w):
+    """Computes the exponent of the Gaussian function."""
+    v = np.array(v)
+    return np.exp(-0.5 * np.dot(v, np.dot(A, v)) + np.dot(w, v))
 
-for file in os.listdir(data_dir):
-    if file.endswith(".txt"):
-        plot_heatmap(file)
+def compute_integral(A, w):
+    """Computes the N-dimensional integral numerically using quadrature."""
+    N = len(w)  # Dimension of the integral
+    bounds = [(-np.inf, np.inf)] * N  # Integrate over entire space
 
-from mpl_toolkits.mplot3d import Axes3D
-
-surface_dir = os.path.join(data_dir, "local density of states height")
-
-if not os.path.exists(surface_dir):
-    os.makedirs(surface_dir)
-
-def plot_surface(filename):
-    """Plots a 3D surface plot of the LDOS data."""
-    data = np.loadtxt(os.path.join(data_dir, filename))
-    X, Y = np.meshgrid(range(data.shape[1]), range(data.shape[0]))
+    # Use lambda to ensure function signature matches expected input
+    integral, error = nquad(lambda *args: gaussian_integrand(*args, A=A, w=w), bounds)
     
-    fig = plt.figure(figsize=(10, 7))
-    ax = fig.add_subplot(111, projection="3d")
-    ax.plot_surface(X, Y, data, cmap="viridis")
-    ax.set_title(f"LDOS Surface Plot - {filename}")
-    ax.set_xlabel("X-axis")
-    ax.set_ylabel("Y-axis")
-    ax.set_zlabel("Density")
-    plt.savefig(os.path.join(surface_dir, f"{filename}_surface.png"))
-    plt.close()
+    return integral
 
-for file in os.listdir(data_dir):
-    if file.endswith(".txt"):
-        plot_surface(file)
+def closed_form_solution(A, w):
+    """Computes the closed-form solution of the Gaussian integral."""
+    A_inv = np.linalg.inv(A)
+    det_A_inv = np.linalg.det(A_inv)
+    exponent = 0.5 * np.dot(w.T, np.dot(A_inv, w))
+    return np.sqrt((2 * np.pi) ** len(A) * det_A_inv) * np.exp(exponent)
 
-subregion = (slice(10, 20), slice(10, 20))  # Select region (rows 10-20, cols 10-20)
-subregion_means = []
+def compute_moments(A, w):
+    """Compute first and second moments using A^-1."""
+    A_inv = np.linalg.inv(A)
+    first_moment = np.dot(A_inv, w)
+    second_moment = A_inv + np.outer(first_moment, first_moment)
+    return first_moment, second_moment
 
-for file in os.listdir(data_dir):
-    if file.endswith(".txt"):
-        data = np.loadtxt(os.path.join(data_dir, file))
-        subregion_means.append(np.mean(data[subregion]))
+# ------------------------------
+# 🔴 Main Code Execution
+# ------------------------------
 
-plt.plot(range(len(subregion_means)), subregion_means, marker="o", linestyle="-")
-plt.xlabel("File Index")
-plt.ylabel("Average LDOS")
-plt.title("Subregion LDOS Analysis")
-plt.show()
+if __name__ == "__main__":
+    # Given Matrices
+    A = np.array([[4, 2, 1], [2, 5, 3], [1, 3, 6]])
+    A_prime = np.array([[4, 2, 1], [2, 1, 3], [1, 3, 6]])  # Another matrix for comparison
+    w = np.array([1, 2, 3])
+
+    # ✅ Check Positive Definiteness
+    print(f"Is A positive definite? {is_positive_definite(A)}")
+    print(f"Is A' positive definite? {is_positive_definite(A_prime)}")
+
+    # ✅ Compute Integrals
+    integral_A = compute_integral(A, w)
+    closed_A = closed_form_solution(A, w)
+
+    print("\n🔹 Numerical Integral for A:", integral_A)
+    print("🔹 Closed-form Solution for A:", closed_A)
+    
+    integral_A_prime = compute_integral(A_prime, w)
+    closed_A_prime = closed_form_solution(A_prime, w)
+
+    print("\n🔹 Numerical Integral for A':", integral_A_prime)
+    print("🔹 Closed-form Solution for A':", closed_A_prime)
+
+    # ✅ Compute Moments
+    first_moment, second_moment = compute_moments(A, w)
+    
+    print("\n🟢 First Moments:", first_moment)
+    print("🟢 Second Moments Matrix:\n", second_moment)
+
+    # ✅ Extracting Moments
+    v1, v2, v3 = first_moment
+    v1v2, v2v3, v1v3 = second_moment[0, 1], second_moment[1, 2], second_moment[0, 2]
+
+    print(f"\n🔹 <v1> = {v1}, <v2> = {v2}, <v3> = {v3}")
+    print(f"🔹 <v1 v2> = {v1v2}, <v2 v3> = {v2v3}, <v1 v3> = {v1v3}")
+
+    # ✅ Higher order moments
+    v1_squared_v2 = v1 ** 2 * v2
+    v2_squared_v3_squared = v2 ** 2 * v3 ** 2
+
+    print(f"\n🔹 <v1^2 v2> = {v1_squared_v2}")
+    print(f"🔹 <v2^2 v3^2> = {v2_squared_v3_squared}")
