@@ -7,7 +7,6 @@ def integrand(v, a, w, p=0):
 	v = array(v)
 	return exp(-dot(v, dot(a, v))/2 + dot(v, w)) * (v**p).prod()
 
-# Using Cholesky decomposition is a bit faster than using inv directly.
 def true_integral(a, w):
 	l = cholesky(a, lower=True)
 	det_l = l.diagonal().prod()
@@ -36,15 +35,12 @@ def verify(a, w):
 # b
 A = [[4,2,1],[2,5,3],[1,3,6]]
 W = [1,2,3]
-verify(A, W) # correct
-verify([[4,2,1],[2,1,3],[1,3,6]], W) # not positive definite
+verify(A, W)
+verify([[4,2,1],[2,1,3],[1,3,6]], W) # not +
 
 # c
-# len(var) must be even number.
-# For each possible way of pairing elements in var,
-# multiply the corresponding elements in s.
-# Then sum all the products.
-# e.g. pairing(s, [1,2,3,4]) = s[1,2] s[3,4] + s[1,3] s[2,4] + s[1,4] s[2,3]
+# len(var) must be even number, for each possible way of pairing elements in var, multiply the corresponding elements in s, then sum all the products.
+# pairing(s, [1,2,3,4]) = s[1,2] s[3,4] + s[1,3] s[2,4] + s[1,4] s[2,3]
 def pairing(s, var):
 	order = len(var)
 	if order == 0:
@@ -54,10 +50,6 @@ def pairing(s, var):
 		result += s[var[0], var[i]] * pairing(s, var[1:i] + var[i+1:])
 	return result
 
-# For multivariate normal distribution with covariance matrix s and mean vector mu,
-# calculate the moments specified by var.
-# c specifies whether the corresponding element in var represents a variable shifted by its mean.
-# e.g. var = [1,2,2] and c = [F,T,F] means the expectation value <v1 (v2-mu2) v2>.
 def wick(s, mu, var, c=None):
 	m = len(var)
 	if m == 0:
@@ -95,8 +87,7 @@ def verify_moment(a, w, p):
 	else:
 		print(f"fail: analytic {expected}, numerical {got}")
 
-# In the comments, I give closed-form expressions for the moments.
-# Below, S means A^-1, and mu means A^-1 w.
+
 verify_moment(A, W, [1,0,0]) # mu1
 verify_moment(A, W, [0,1,0]) # mu2
 verify_moment(A, W, [0,0,1]) # mu3

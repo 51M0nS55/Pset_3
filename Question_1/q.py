@@ -38,9 +38,7 @@ def compute_moments(A, w):
     second_moment = A_inv + np.outer(first_moment, first_moment)
     return first_moment, second_moment
 
-# ------------------------------
-# 🔴 Main Code Execution
-# ------------------------------
+
 
 if __name__ == "__main__":
     # Given Matrices
